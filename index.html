@@ -532,6 +532,7 @@ const FB_CONFIG = {
   authDomain: "donaciones-venezuela.firebaseapp.com",
   databaseURL: "https://donaciones-venezuela-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "donaciones-venezuela",
+  storageBucket: "donaciones-venezuela.firebasestorage.app",
   appId: "1:785596586496:web:432df7b21fa218efa596e5"
 };
 // ════════════════════════════════════════════════
@@ -714,6 +715,8 @@ function openGalleryUpload(){
   const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
   s("galleryTitle","");s("galleryDate",td());s("galleryBen","");s("galleryDesc","");s("videoUrl","");
   const pi=document.getElementById("photoInput");if(pi)pi.value="";
+  const dz=document.getElementById("dropZone");if(dz)dz.style.display="";
+  clearPhotoPreview();
   const pp=document.getElementById("photoPreview");if(pp)pp.style.display="none";
   const up=document.getElementById("galleryUploadProgress");if(up)up.style.display="none";
   const pb=document.getElementById("galleryProgressBar");if(pb)pb.style.width="0%";
@@ -734,16 +737,64 @@ function setMediaType(type){
   if(tv){tv.style.background=!isPhoto?"var(--navy)":"var(--bg)";tv.style.color=!isPhoto?"white":"var(--ink2)";tv.style.border=!isPhoto?"none":"1px solid var(--bdr)";}
 }
 
+function openCameraCapture(){
+  document.getElementById("cameraInput").click();
+}
+
+function clearPhotoPreview(){
+  document.getElementById("previewImg").src="";
+  document.getElementById("photoPreview").style.display="none";
+  document.getElementById("photoInput").value="";
+  document.getElementById("cameraInput").value="";
+}
+
+function handleDragOver(e){
+  e.preventDefault();
+  const dz=document.getElementById("dropZone");
+  if(dz){dz.style.borderColor="var(--orange)";dz.style.background="var(--orangeS)";}
+}
+
+function handleDragLeave(e){
+  const dz=document.getElementById("dropZone");
+  if(dz){dz.style.borderColor="var(--bdr)";dz.style.background="var(--bg)";}
+}
+
+function handleDrop(e){
+  e.preventDefault();
+  handleDragLeave(e);
+  const files=e.dataTransfer&&e.dataTransfer.files;
+  if(!files||!files.length)return;
+  const file=files[0];
+  if(!file.type.startsWith("image/")){
+    showStatus("Solo se pueden soltar imágenes. Para vídeo usa el botón 🎥 Vídeo.","err");
+    return;
+  }
+  // Inject file into input and show preview
+  const dt=new DataTransfer();
+  dt.items.add(file);
+  const inp=document.getElementById("photoInput");
+  inp.files=dt.files;
+  const ev=new Event("change",{bubbles:true});
+  inp.dispatchEvent(ev);
+}
+
+
 function previewPhoto(e){
   const file=e.target.files[0];if(!file)return;
+  // If camera input was used, also set photoInput reference for upload
+  if(e.target.id==="cameraInput"){
+    const dt=new DataTransfer();dt.items.add(file);
+    const pi=document.getElementById("photoInput");
+    if(pi)pi.files=dt.files;
+  }
   const reader=new FileReader();
   reader.onload=ev=>{
     const img=document.getElementById("previewImg");
     const pp=document.getElementById("photoPreview");
-    const pl=document.getElementById("photoLabel");
+    const dz=document.getElementById("dropZone");
     if(img)img.src=ev.target.result;
     if(pp)pp.style.display="block";
-    if(pl)pl.style.background="var(--card)";
+    if(dz)dz.style.display="none";
   };
   reader.readAsDataURL(file);
 }
@@ -1226,15 +1277,21 @@ init();
     </div>
 
     <div id="photoUploadSection">
-      <div id="photoPreview" style="display:none;margin-bottom:12px;border-radius:12px;overflow:hidden">
-        <img id="previewImg" src="" alt="" style="width:100%;max-height:240px;object-fit:cover;border-radius:12px"/>
+      <div id="photoPreview" style="display:none;margin-bottom:12px;border-radius:12px;overflow:hidden;position:relative">
+        <img id="previewImg" src="" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;display:block"/>
+        <button onclick="clearPhotoPreview()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
       </div>
-      <label style="display:block;border:2px dashed var(--bdr);border-radius:12px;padding:28px;text-align:center;cursor:pointer;background:var(--bg);transition:background .15s" id="photoLabel">
-        <div style="font-size:36px;margin-bottom:8px">📷</div>
-        <div style="font-weight:700;color:var(--navy);margin-bottom:4px">Toca para elegir foto</div>
-        <div style="font-size:12px;color:var(--ink3)">JPG · PNG · HEIC — máx. 8 MB</div>
-        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event)"/>
-      </label>
+      <div id="dropZone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" onclick="document.getElementById('photoInput').click()" style="border:2px dashed var(--bdr);border-radius:12px;padding:24px 16px;text-align:center;cursor:pointer;background:var(--bg);transition:all .2s">
+        <div style="font-size:36px;margin-bottom:8px">📁</div>
+        <div style="font-weight:700;color:var(--navy);margin-bottom:6px;font-size:15px">Elige archivo o arrastra aquí</div>
+        <div style="font-size:12px;color:var(--ink3);margin-bottom:14px">JPG · PNG · HEIC — se comprime automáticamente</div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap" onclick="event.stopPropagation()">
+          <button onclick="openCameraCapture()" style="padding:9px 18px;background:var(--navy);color:white;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📷 Cámara</button>
+          <button onclick="document.getElementById('photoInput').click()" style="padding:9px 18px;background:var(--orange);color:white;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🖼 Galería / Archivo</button>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="previewPhoto(event)"/>
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event)"/>
+      </div>
     </div>
 
     <div id="videoUploadSection" style="display:none">
